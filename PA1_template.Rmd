@@ -1,0 +1,149 @@
+Reproducible Data - Assignment 1 - Activity Tracker
+----------------------------------------------------
+**Elias CO, April 16, 2015**
+
+output:
+  pdf_document:
+    fig_caption: yes
+
+###Assignment
+
+This assignment will be described in multiple parts. You will need to write a report that answers the questions detailed below. Ultimately, you will need to complete the entire assignment in a single R markdown document that can be processed by knitr and be transformed into an HTML file.
+
+Throughout your report make sure you always include the code that you used to generate the output you present. When writing code chunks in the R markdown document, always use echo = TRUE so that someone else will be able to read the code. This assignment will be evaluated via peer assessment so it is essential that your peer evaluators be able to review the code for your analysis.
+
+For the plotting aspects of this assignment, feel free to use any plotting system in R (i.e., base, lattice, ggplot2)
+
+Fork/clone the GitHub repository created for this assignment. You will submit this assignment by pushing your completed files into your forked repository on GitHub. The assignment submission will consist of the URL to your GitHub repository and the SHA-1 commit ID for your repository state.
+
+NOTE: The GitHub repository also contains the dataset for the assignment so you do not have to download the data separately.
+
+###Data
+
+The data for this assignment can be downloaded from the course web site:
+
+Dataset: Activity monitoring data [52K]
+The variables included in this dataset are:
+
+steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+
+date: The date on which the measurement was taken in YYYY-MM-DD format
+
+interval: Identifier for the 5-minute interval in which measurement was taken
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+#Loading and preprocessing the data
+
+
+
+```{r}
+library(plyr)
+library(ggplot2)
+
+# Read the data
+act <- read.csv("~/Desktop/R/RepData/1/activity.csv") 
+```
+
+Read the data downloaded and open libraries that will be used in future lines
+
+#What is mean total number of steps taken per day?
+
+```{r, echo=TRUE}
+#Total number of steps taken per day
+daily.steps <- aggregate(act$steps, by = list(act$date), sum, na.rm=TRUE) 
+names(daily.steps) <- c("Date", "steps")
+
+#Histogram of the total number of steps each day
+qplot(steps, data = daily.steps, geom="histogram", xlab = "Daily Number of Steps",ylab = "# of Steps", binwidth = 300)
+
+#Calculate and report the mean and median of the total number of steps taken each day
+meanste <- mean(daily.steps$steps) 
+str(meanste)
+medianste <- median(daily.steps$steps)
+str(medianste)
+```
+
+Mean is equal to 9354 
+Median is equal to 10395
+
+#What is the average daily activity pattern?
+
+```{r, echo=TRUE}
+#df of the mean and median number of steps taken, averaged across all days (y-axis)
+int.steps <- aggregate(act$steps, by = list(act$interval), mean, na.rm=TRUE)
+int.stepsmed <- aggregate(act$steps, by = list(act$interval), median, na.rm=TRUE)
+
+int.steps <- cbind(int.steps[], int.stepsmed$x)
+
+#Tidy the df names and round the numbers
+names(int.steps) = c("interval","meanste", "medianste")
+int.steps$meanste <- round(int.steps$meanste)
+int.steps$medianste <- round(int.steps$medianste)
+
+
+ggplot(int.steps, aes(x = interval, y = meanste)) + geom_line()
+
+most.steps <- int.steps$interval[int.steps$meanste == max(int.steps$meanste)]
+str(most.steps)
+
+```
+
+The 5 minutes interval that contain the must steps is aprox 835
+
+#Imputing missing values
+
+```{r, echo=TRUE}
+#Find the NAs
+na.steps <- subset(act, is.na(steps))
+num.NAs <-length(na.steps$steps)
+
+#Replace the NAs with the median number of steps for that period
+nustps <- data.frame(date=act$date[is.na(act$steps)], interval = act$interval[is.na(act$steps)], steps=int.steps[match(int.steps$interval, act$interval[is.na(act$steps)]),3])
+
+# Remove the NA's
+activity <- subset(act, !is.na(steps))
+
+# Median steps to the Activity DF
+activity <- rbind(act, nustps)
+
+#Sum the number of steps each day into the dailysteps1 DF and get the mean and median 
+dailysteps1 <- aggregate(activity$steps, by = list(activity$date), sum, na.rm=TRUE)
+names(dailysteps1) <- c("Date", "steps")
+
+qplot(steps, data = dailysteps1, geom="histogram", xlab = "Daily Number of Steps", binwidth = 300)
+
+meanste1 <- mean(dailysteps1$steps)
+str(meanste1)
+medianste1 <- median(dailysteps1$steps)
+str(medianste1)
+
+```
+
+Mean is equal to 9504 
+Median is equal to 10395
+
+The mean slightly increases and there is no clear impact of the results of the analysis.
+
+#Are there differences in activity patterns between weekdays and weekends?
+
+```{r, echo=TRUE}
+
+weekday.or.weekend <- function(date) {
+    day <- weekdays(date)
+    if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+        return("weekday")
+    else if (day %in% c("Saturday", "Sunday"))
+        return("weekend")
+    else
+        stop("invalid date")
+}
+
+act$date <- as.Date(act$date)
+act$day <- sapply(act$date, FUN=weekday.or.weekend)
+
+averages <- aggregate(steps ~ interval + day, data=act, mean)
+ggplot(averages, aes(interval, steps)) + geom_line() + facet_grid(day ~.) + xlab("5-minute interval") + ylab("Number of steps")
+```
+
+The steps start later during the weekend but after starts there is a higher walk rate
